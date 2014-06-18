@@ -1,0 +1,12 @@
+apply plugin:'java'
+apply plugin:'groovy'
+apply plugin:'idea'
+
+repositories {
+  mavenCentral()
+  jcenter()
+}
+dependencies {
+  testCompile 'org.codehaus.groovy:groovy-all:[2,3)'
+  testCompile 'org.spockframework:spock-core:0.7-groovy-2.0'
+}
