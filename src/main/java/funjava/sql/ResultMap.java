@@ -30,7 +30,7 @@ public class ResultMap extends AbstractMap<Object, Object> {
    *
    * @return The key for these results; never {@code null}.
    */
-  public ResultMapKey getKey() {
+  public ResultMapKey getMapKey() {
     return key;
   }
 
@@ -51,9 +51,9 @@ public class ResultMap extends AbstractMap<Object, Object> {
 
   @Override
   public boolean containsValue(Object value) {
-    for (int i = 0; i < results.length; i++) {
-      if (results[i] == value) return true;
-      if (results[i] != null && results[i].equals(value)) return true;
+    for (final Object result : results) {
+      if (result == value) return true;
+      if (result != null && result.equals(value)) return true;
     }
     return false;
   }
@@ -99,8 +99,8 @@ public class ResultMap extends AbstractMap<Object, Object> {
     Set<Entry<Object, Object>> toReturn = new HashSet<>();
     for (int i = 0; i < results.length; i++) {
       Object result = results[i];
-      SimpleImmutableEntry nameEntry = new SimpleImmutableEntry(key.getName(i), result);
-      SimpleImmutableEntry indexEntry = new SimpleImmutableEntry(i, result);
+      SimpleImmutableEntry<Object, Object> nameEntry = new SimpleImmutableEntry<>(key.getName(i), result);
+      SimpleImmutableEntry<Object, Object> indexEntry = new SimpleImmutableEntry<>(i, result);
       toReturn.add(nameEntry);
       toReturn.add(indexEntry);
     }
@@ -131,4 +131,5 @@ public class ResultMap extends AbstractMap<Object, Object> {
     key.assertIndex(columnIndex);
     results[columnIndex] = value;
   }
+
 }

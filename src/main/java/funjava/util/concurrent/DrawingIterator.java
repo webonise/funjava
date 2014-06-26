@@ -102,27 +102,17 @@ public class DrawingIterator<T> implements Iterator<T> {
   @Override
   public void forEachRemaining(final Consumer<? super T> action) {
     // First, check if we're done
-    if (task.isDone() && queue.isEmpty()) return;
+    if (!hasNext()) return;
 
-    // Keep draining the queue until it's really empty
+    // Now, exhaust 'next'
+    action.accept(this.next());
+
+    // Now keep draining the queue until it's really empty
     List<T> drain = new ArrayList<>();
     while (!queue.isEmpty()) {
       queue.drainTo(drain);
       drain.forEach(action::accept);
       drain.clear();
-    }
-
-    // We got ahead of the task; give it a chance to get ahead of us
-    // (It could also be that we're done, in which case what follows is an expensive nop.)
-    try {
-      // If the task is done, this will return immediately
-      task.get(10L, TimeUnit.MILLISECONDS);
-    } catch (InterruptedException e) {
-      throw new RuntimeException("Interrupted while waiting for task to fill the queue", e);
-    } catch (ExecutionException e) {
-      throw new RuntimeException("Task filling the queue threw an exception", e);
-    } catch (TimeoutException e) {
-      // Task is still alive; that's fine—move on
     }
 
     // Tail recurse and let the next round determine if we're done

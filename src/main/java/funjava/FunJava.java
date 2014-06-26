@@ -1,40 +1,23 @@
 package funjava;
 
-import java.util.Objects;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.*;
+import java.util.logging.*;
 
 /**
  * Infrastructure and basic utilities used throughout the project.
  */
 public class FunJava {
 
-  private static volatile ExecutorService executor;
+  private static final AtomicLong ctr = new AtomicLong(0L);
+  private static volatile ExecutorService executor = createDefaultExecutorService();
+
+  // Shutdown the executor when we shutdown the runtime: this will trigger exceptions in any running tasks.
   static {
-    final AtomicLong ctr = new AtomicLong(0L);
-    Thread.UncaughtExceptionHandler handler = new Thread.UncaughtExceptionHandler() {
-      @Override
-      public void uncaughtException(Thread t, Throwable e) {
-        Logger logger = Logger.getLogger(FunJava.class.getName());
-        logger.log(Level.SEVERE, "Uncaught exception in executor", e);
-      }
-    };
-    ThreadFactory factory = new ThreadFactory() {
-      @Override
-      public Thread newThread(Runnable r) {
-        Thread t = new Thread(r);
-        t.setName(FunJava.class.getSimpleName() + " #" + ctr.incrementAndGet());
-        t.setUncaughtExceptionHandler(handler);
-        t.setDaemon(true);
-        t.setPriority(Thread.NORM_PRIORITY);
-        return t;
-      }
-    };
-    executor = Executors.newCachedThreadPool(factory);
+    Thread t = new Thread(() -> getExecutor().shutdownNow());
+    t.setPriority(Thread.MIN_PRIORITY); // Hint that higher priority threads should be allowed to execute
+    Runtime.getRuntime().addShutdownHook(t);
   }
 
   /**
@@ -46,10 +29,31 @@ public class FunJava {
   public static ExecutorService getExecutor() {
     synchronized (executor) {
       if (executor.isShutdown()) {
-        throw new IllegalStateException("Executor is shutdown");
+        executor = createDefaultExecutorService();
       }
       return executor;
     }
+  }
+
+  /**
+   * Provides an instance of the default-configured executor service.
+   *
+   * @return A new executor service to be used; never {@code null}.
+   */
+  public static ExecutorService createDefaultExecutorService() {
+    Thread.UncaughtExceptionHandler handler = (t, e) -> {
+      Logger logger = Logger.getLogger(FunJava.class.getName());
+      logger.log(Level.SEVERE, "Uncaught exception in executor", e);
+    };
+    ThreadFactory factory = r -> {
+      Thread t = new Thread(r);
+      t.setName(FunJava.class.getSimpleName() + " #" + Long.toHexString(ctr.incrementAndGet()));
+      t.setUncaughtExceptionHandler(handler);
+      t.setDaemon(true);
+      t.setPriority(Thread.MIN_PRIORITY);
+      return t;
+    };
+    return Executors.newCachedThreadPool(factory);
   }
 
   /**
@@ -60,9 +64,6 @@ public class FunJava {
    */
   public static void setExecutor(ExecutorService executor) {
     Objects.requireNonNull(executor, "Executor");
-    if (executor.isShutdown()) {
-      throw new IllegalArgumentException("Executor is shutdown");
-    }
     FunJava.executor = executor;
   }
 }
