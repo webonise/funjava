@@ -100,7 +100,7 @@ public class StreamFork<A> implements AutoCloseable {
     if (q == null) {
       long upstreamSize = upstream.estimateSize();
       if(upstreamSize < Integer.MAX_VALUE) {
-        q = new ArrayBlockingQueue<>((int)upstreamSize);
+        q = new ArrayBlockingQueue<A>((int)upstreamSize);
       } else {
         q = new LinkedBlockingQueue<>();
       }

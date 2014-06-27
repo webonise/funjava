@@ -5,7 +5,8 @@ import java.sql.SQLException;
 import java.util.*;
 
 /**
- * Represents the key of a result: the names and types of the columns in the order returned.
+ * Represents the key of a result: the names and types of the columns in the order returned. In addition to the
+ * key names,
  */
 public class ResultMapKey {
 

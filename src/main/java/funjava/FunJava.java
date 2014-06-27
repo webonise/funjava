@@ -17,6 +17,8 @@ public class FunJava {
   static {
     Thread t = new Thread(() -> getExecutor().shutdownNow());
     t.setPriority(Thread.MIN_PRIORITY); // Hint that higher priority threads should be allowed to execute
+    t.setName("FunJava Executor Shutdown Thread");
+    t.setDaemon(true);
     Runtime.getRuntime().addShutdownHook(t);
   }
 
@@ -50,7 +52,7 @@ public class FunJava {
       t.setName(FunJava.class.getSimpleName() + " #" + Long.toHexString(ctr.incrementAndGet()));
       t.setUncaughtExceptionHandler(handler);
       t.setDaemon(true);
-      t.setPriority(Thread.MIN_PRIORITY);
+      t.setPriority(Thread.NORM_PRIORITY);
       return t;
     };
     return Executors.newCachedThreadPool(factory);
