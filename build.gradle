@@ -1,6 +1,11 @@
 apply plugin:'java'
 apply plugin:'groovy'
 apply plugin:'idea'
+apply plugin: "jacoco"
+apply plugin:'maven-publish'
+
+group = "com.webonise.funjava"
+version = "0.0.1-SNAPSHOT"
 
 repositories {
   mavenCentral()
@@ -9,4 +14,28 @@ repositories {
 dependencies {
   testCompile 'org.codehaus.groovy:groovy-all:[2,3)'
   testCompile 'org.spockframework:spock-core:0.7-groovy-2.0'
+  testCompile 'com.h2database:h2:[1.4.178,1.5)'
+}
+
+jacocoTestReport {
+  reports {
+    xml.enabled false
+    csv.enabled false
+  }
+}
+
+task sourceJar(type: Jar) {
+  from sourceSets.main.allJava
+}
+
+publishing {
+  publications {
+    mavenJava(MavenPublication) {
+      from components.java
+
+      artifact sourceJar {
+        classifier "sources"
+      }
+    }
+  }
 }

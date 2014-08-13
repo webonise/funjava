@@ -50,7 +50,7 @@ public class FlattenedFuture<V> implements Future<V> {
    */
   @Override
   public boolean isCancelled() {
-    return it.isCancelled() || (applyInside(f -> f.isCancelled()) && it.isDone());
+    return it.isCancelled() || (isDone() && applyInside(Future::isCancelled));
   }
 
   /**
@@ -58,7 +58,7 @@ public class FlattenedFuture<V> implements Future<V> {
    */
   @Override
   public boolean isDone() {
-    return it.isDone() && applyInside(f -> f.isDone());
+    return it.isDone() && applyInside(Future::isDone);
   }
 
   /**

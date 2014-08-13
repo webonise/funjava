@@ -10,8 +10,9 @@ import java.util.function.*;
 import java.util.stream.*;
 
 /**
- * {@link java.util.stream.Stream} instances aren't intended to be consumed more than once. But sometimes it is really
- * handy to have two forks. This class implements that capability, however it does this in a somewhat limited way.
+ * {@link java.util.stream.Stream} instances aren't intended to be consumed more than once, which makes a fork tricky.
+ * But sometimes it is really
+ * handy to fork a stream. This class implements that capability, however it does this in a somewhat limited way.
  * <p>
  * This class acts as a terminal of an existing stream. It is, however, a lazy terminal. The value that this terminal
  * produces is a stream factory. The generated streams are independent, and may be executed at any time. However, any
@@ -51,7 +52,7 @@ public class StreamFork<A> implements AutoCloseable {
    * {@code forkCount} times.</strong>
    *
    * @param upstream  The stream to terminate; never {@code null}
-   * @param forkCount The count of the number of forks to pre-initialize: values less than zero are equivalent to zero
+   * @param forkCount The count of the number of forks to pre-initialize; values less than zero are equivalent to zero
    */
   public StreamFork(Stream<A> upstream, int forkCount) {
     Objects.requireNonNull(upstream, "upstream stream");
@@ -77,7 +78,6 @@ public class StreamFork<A> implements AutoCloseable {
    */
   public Stream<A> fork() {
     Queue<A> q = generateQueue();
-    Runnable c = this::tryReadUpstream;
 
     Spliterator source = new Spliterators.AbstractSpliterator<A>(upstream.estimateSize(), upstream.characteristics()) {
 
@@ -99,8 +99,8 @@ public class StreamFork<A> implements AutoCloseable {
     Queue<A> q = queueQueue.poll();
     if (q == null) {
       long upstreamSize = upstream.estimateSize();
-      if(upstreamSize < Integer.MAX_VALUE) {
-        q = new ArrayBlockingQueue<A>((int)upstreamSize);
+      if (upstreamSize < Integer.MAX_VALUE) {
+        q = new ArrayBlockingQueue<A>((int) upstreamSize);
       } else {
         q = new LinkedBlockingQueue<>();
       }

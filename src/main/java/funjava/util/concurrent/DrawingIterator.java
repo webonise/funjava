@@ -5,12 +5,14 @@ import java.util.concurrent.*;
 import java.util.function.*;
 
 /**
- * Provides an {@link java.util.Iterator} API for consuming a {@link java.util.concurrent.BlockingQueue} being filled by
+ * Provides an {@link java.util.Iterator} API for consuming a {@link java.util.concurrent.BlockingQueue} being filled
+ * by
  * a {@link java.util.concurrent.Future}. This class is very useful, given a few limitations: <ul> <li>This class
  * presumes that it is the only thing drawing from the queue.</li> <li>This class is NOT itself thread-safe.</li>
  * <li>The queue cannot contain {@code null} elements as meaningful values.</li> </ul>
  * <p>
- * Note that this class's {@link #forEachRemaining(java.util.function.Consumer)} is much more efficient than the classic
+ * Note that this class's {@link #forEachRemaining(java.util.function.Consumer)} is much more efficient than the
+ * classic
  * {@link java.util.Iterator} loop.
  */
 public class DrawingIterator<T> implements Iterator<T> {
@@ -88,7 +90,8 @@ public class DrawingIterator<T> implements Iterator<T> {
       return toReturn;
     }
 
-    // Since we can assume that we have a next element here, just blindly take an element from the queue.
+    // Since the API lets us assume we have a next element when this method is called, we just blindly take an element
+    // from the queue.
     try {
       return queue.take();
     } catch (InterruptedException e) {
@@ -111,7 +114,7 @@ public class DrawingIterator<T> implements Iterator<T> {
     List<T> drain = new ArrayList<>();
     while (!queue.isEmpty()) {
       queue.drainTo(drain);
-      drain.forEach(action::accept);
+      drain.forEach(action);
       drain.clear();
     }
 

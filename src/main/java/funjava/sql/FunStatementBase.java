@@ -1,7 +1,7 @@
 package funjava.sql;
 
 import funjava.util.concurrent.DrawingIterator;
-import funjava.util.function.Functions;
+import funjava.util.function.FunConsumer;
 
 import java.sql.*;
 import java.util.*;
@@ -21,13 +21,25 @@ public abstract class FunStatementBase<T extends Statement> implements Supplier<
   private final Consumer<T> configurator;
 
   /**
+   * Constructs an instance that will return that single instance and rely on the provider to generate statements,
+   * and does no further configuration. The caller is responsible for closing the {@link Connection} which is passed
+   * into this class.
+   *
+   * @param connection The connection to use; never {@code null}.
+   * @param provider   The means of generating a {@link java.sql.Statement}; never {@code null}.
+   */
+  public FunStatementBase(Connection connection, Function<Connection, T> provider) {
+    this(() -> Connections.createSuppressingCloseProxy(connection), provider);
+  }
+
+  /**
    * Constructs an instance that will rely on the provider to generate statements, and does no further configuration.
    *
    * @param connection The functional connection; never {@code null}.
-   * @param provider   The provider
+   * @param provider   The means of generating a {@link java.sql.Statement}; never {@code null}.
    */
   public FunStatementBase(Supplier<Connection> connection, Function<Connection, T> provider) {
-    this(connection, provider, Functions.doNothingConsumer());
+    this(connection, provider, FunConsumer.doNothingConsumer());
   }
 
   /**
@@ -40,7 +52,7 @@ public abstract class FunStatementBase<T extends Statement> implements Supplier<
    */
   public FunStatementBase(Supplier<Connection> connection, Function<Connection, T> provider, Consumer<T> configurator) {
     Objects.requireNonNull(connection, "functional connection");
-    if(connection instanceof FunConnection) {
+    if (connection instanceof FunConnection) {
       this.connection = FunConnection.class.cast(connection);
     } else {
       this.connection = new FunConnection(connection);
@@ -63,27 +75,8 @@ public abstract class FunStatementBase<T extends Statement> implements Supplier<
   /**
    * Uses {@link FunConnection#withConnection(java.util.function.Function)} to generate a connection,
    * then creates the statement, configures it, and executes the given callback within that connection context.
-   *
-   * @param callback The callback to execute; never {@code null}.
-   * @param <U>      The type of value returned by the callback.
-   * @return A future that will resolve to the return value of the callback.
-   */
-  public <U> Future<U> withStatement(Function<T, U> callback) {
-    Objects.requireNonNull(callback, "statement callback");
-    return connection.withConnection(c -> {
-      try (T s = provider.apply(c)) {
-        configurator.accept(s);
-        return callback.apply(s);
-      } catch (SQLException e) {
-        throw new RuntimeException("Error executing statement", e);
-      }
-    });
-  }
-
-  /**
-   * Uses {@link FunConnection#withConnection(java.util.function.Function)} to generate a connection,
-   * then creates the statement, configures it, and executes the given callback within that connection context.
-   * The {@link funjava.sql.FunConnection} that powers {@code this} is also passed into the callback. If you are looking
+   * The {@link funjava.sql.FunConnection} that powers {@code this} is also passed into the callback. If you are
+   * looking
    * for access to the raw {@link java.sql.Connection}, then use {@link java.sql.Statement#getConnection()}.
    *
    * @param callback The callback to execute; never {@code null}.
@@ -93,22 +86,14 @@ public abstract class FunStatementBase<T extends Statement> implements Supplier<
   public <U> Future<U> withStatement(BiFunction<T, FunConnection, U> callback) {
     Objects.requireNonNull(callback, "statement callback");
     return connection.withConnection(c -> {
-      try (T s = provider.apply(c)) {
-        configurator.accept(s);
-        return callback.apply(s, connection);
-      } catch (SQLException e) {
-        throw new RuntimeException("Error executing statement", e);
-      }
-    });
-  }
-
-  /**
-   * Provides access to the functional connection that powers this statement.
-   *
-   * @return the functional connection; never {@code null}
-   */
-  public FunConnection getConnection() {
-    return connection;
+          try (T s = provider.apply(c)) {
+            configurator.accept(s);
+            return callback.apply(s, connection);
+          } catch (SQLException e) {
+            throw new RuntimeException("Error executing statement", e);
+          }
+        }
+    );
   }
 
   /**
@@ -124,22 +109,57 @@ public abstract class FunStatementBase<T extends Statement> implements Supplier<
   }
 
   /**
+   * Provides access to the functional connection that powers this statement.
+   *
+   * @return the functional connection; never {@code null}
+   */
+  public FunConnection getConnection() {
+    return connection;
+  }
+
+  /**
    * Given a mapping from a statement to a {@link java.sql.ResultSet}, return a {@link java.util.stream.Stream} of
    * {@link funjava.sql.ResultMap} instances. The stream is populated asynchronously.
    *
    * @param fetch The function to generate the results to stream; never {@code null}
    * @return The stream of results; never {@code null}
    */
-  public Stream<ResultMap> streamResults(Function<T,ResultSet> fetch) {
+  public Stream<ResultMap> streamResults(Function<T, ResultSet> fetch) {
     final BlockingQueue<ResultMap> q = new LinkedBlockingQueue<>();
     final Future<Void> future = withStatement(s -> {
-      final ResultSet rs = fetch.apply(s);
-      FunConnection.readResultSetIntoQueue(rs, q);
-      return null;
-    });
+          final ResultSet rs = fetch.apply(s);
+          FunConnection.readResultSetIntoQueue(rs, q);
+          return null;
+        }
+    );
     DrawingIterator<ResultMap> it = new DrawingIterator<>(future, q);
-    Spliterator<ResultMap> spliterator = Spliterators.spliteratorUnknownSize(it, Spliterator.ORDERED | Spliterator.DISTINCT | Spliterator.NONNULL | Spliterator.IMMUTABLE);
+    Spliterator<ResultMap> spliterator = Spliterators.spliteratorUnknownSize(it, Spliterator.ORDERED | Spliterator
+                                                                                                           .DISTINCT
+                                                                                     | Spliterator.NONNULL |
+                                                                                     Spliterator.IMMUTABLE
+    );
     return StreamSupport.stream(spliterator, false);
+  }
+
+  /**
+   * Uses {@link FunConnection#withConnection(java.util.function.Function)} to generate a connection,
+   * then creates the statement, configures it, and executes the given callback within that connection context.
+   *
+   * @param callback The callback to execute; never {@code null}.
+   * @param <U>      The type of value returned by the callback.
+   * @return A future that will resolve to the return value of the callback.
+   */
+  public <U> Future<U> withStatement(Function<T, U> callback) {
+    Objects.requireNonNull(callback, "statement callback");
+    return connection.withConnection(c -> {
+          try (T s = provider.apply(c)) {
+            configurator.accept(s);
+            return callback.apply(s);
+          } catch (SQLException e) {
+            throw new RuntimeException("Error executing statement", e);
+          }
+        }
+    );
   }
 
 

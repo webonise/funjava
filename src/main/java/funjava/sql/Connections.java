@@ -8,6 +8,7 @@ import java.lang.reflect.Proxy;
 import java.sql.Connection;
 import java.sql.Wrapper;
 import java.util.*;
+import java.util.function.*;
 
 /**
  * Utilities for working with a {@link java.sql.Connection}.
@@ -23,7 +24,7 @@ public class Connections {
    */
   public static Connection createSuppressingCloseProxy(Connection conn) {
     Objects.requireNonNull(conn, "connection to proxy");
-    return createProxy(new CloseSuppressingInvocationHandler(conn));
+    return createProxy(conn, CloseSuppressingInvocationHandler::new);
   }
 
   /**
@@ -31,21 +32,27 @@ public class Connections {
    * This performs the actual {@link java.lang.reflect.Proxy} logic, along with wrapping the proxy in a
    * {@link funjava.lang.reflect.WrapperInvocationHandler} proxy.
    *
-   * @param handler the handler for connection method calls.
+   * @param connection     the connection to proxy
+   * @param handlerFactory the function that will generate a handler for connection method calls.
    * @return A {@link java.sql.Connection} proxy that delegates to the handler; never {@code null}
    */
-  public static Connection createProxy(InvocationHandler handler) {
-    Objects.requireNonNull(handler, "the handler for connection method calls");
-    ClassLoader classLoader = handler.getClass().getClassLoader();
-    Object proxy = Proxy.newProxyInstance(classLoader, new Class[]{Connection.class}, handler);
-    proxy = Proxy.newProxyInstance(
-                                      classLoader,
-                                      new Class[]{Connection.class, Wrapper.class},
-                                      new WrapperInvocationHandler(proxy)
+  public static Connection createProxy(Connection connection, Function<Connection, InvocationHandler> handlerFactory) {
+    Objects.requireNonNull(connection, "the connection to create");
+    Objects.requireNonNull(handlerFactory, "the handler for connection method calls");
+    ClassLoader classLoader = connection.getClass().getClassLoader();
+    Connection proxy = Connection.class.cast(Proxy.newProxyInstance(
+                                                                       classLoader,
+                                                                       new Class[]{Connection.class, Wrapper.class},
+                                                                       new WrapperInvocationHandler(connection)
+        )
     );
-    Connection proxyConn = Connection.class.cast(proxy);
-    return proxyConn;
+    proxy = Connection.class.cast(Proxy.newProxyInstance(
+                                                            classLoader,
+                                                            new Class[]{Connection.class, Wrapper.class},
+                                                            handlerFactory.apply(proxy)
+        )
+    );
+    return proxy;
   }
-
 
 }

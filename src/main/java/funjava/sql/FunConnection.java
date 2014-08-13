@@ -1,7 +1,8 @@
 package funjava.sql;
 
 import funjava.FunJava;
-import funjava.util.function.Functions;
+import funjava.util.function.FunConsumer;
+import funjava.util.function.FunSupplier;
 
 import javax.naming.Context;
 import javax.naming.InitialContext;
@@ -26,8 +27,8 @@ import java.util.stream.*;
  */
 public class FunConnection implements Supplier<Connection> {
 
-  private final Supplier<Connection> provider;
-  private final Consumer<Connection> configurator;
+  private final FunSupplier<Connection> provider;
+  private final FunConsumer<Connection> configurator;
 
   /**
    * Constructs an instance that will rely on the provider to generate connections, and does no configuration.
@@ -35,7 +36,7 @@ public class FunConnection implements Supplier<Connection> {
    * @param provider The means of generating a {@link java.sql.Connection}; never {@code null}.
    */
   public FunConnection(Supplier<Connection> provider) {
-    this(provider, Functions.doNothingConsumer());
+    this(provider, FunConsumer.doNothingConsumer());
   }
 
   /**
@@ -47,12 +48,12 @@ public class FunConnection implements Supplier<Connection> {
    */
   public FunConnection(Supplier<Connection> provider, Consumer<Connection> configurator) {
     Objects.requireNonNull(provider, "Connection provider");
-    this.provider = provider;
+    this.provider = FunSupplier.of(provider);
     Objects.requireNonNull(configurator, "Connection configurator");
-    this.configurator = configurator;
+    this.configurator = FunConsumer.of(configurator);
   }
 
-  public static final Consumer<Connection> closeQuietly() {
+  public static final FunConsumer<Connection> closeQuietly() {
     return FunConnection::closeQuietly;
   }
 
@@ -189,7 +190,9 @@ public class FunConnection implements Supplier<Connection> {
       try {
         return DriverManager.getConnection(connString, user, password);
       } catch (SQLException e) {
-        throw new RuntimeException("Error constructing connection using " + connString + " for user " + user + " (password hidden)", e);
+        throw new RuntimeException("Error constructing connection using " + connString + " for user " + user + " " +
+                                       "(password hidden)", e
+        );
       }
     };
   }
@@ -240,10 +243,11 @@ public class FunConnection implements Supplier<Connection> {
   public <T> Future<T> withConnection(final Function<Connection, T> callback) {
     Objects.requireNonNull(callback, "connection callback");
     return FunJava.getExecutor().submit(() -> {
-      try (Connection c = get()) {
-        return callback.apply(c);
-      }
-    });
+          try (Connection c = get()) {
+            return callback.apply(c);
+          }
+        }
+    );
   }
 
   /**
@@ -280,9 +284,10 @@ public class FunConnection implements Supplier<Connection> {
       if (c != null) c.close();
     } catch (Exception ignored) {
       FunJava.getExecutor().submit(() -> {
-        Logger logger = Logger.getLogger(Connection.class.getName());
-        logger.log(Level.INFO, "Error while quietly closing connection", ignored);
-      });
+            Logger logger = Logger.getLogger(Connection.class.getName());
+            logger.log(Level.INFO, "Error while quietly closing connection", ignored);
+          }
+      );
     }
   }
 
@@ -394,14 +399,15 @@ public class FunConnection implements Supplier<Connection> {
    * @param sql       The SQL to execute; never {@code null}.
    * @param argSetter The function that will assign the args to use; never {@code null}.
    * @return A stream of the results as {@link funjava.sql.ResultMap} instances.
-   * @see funjava.util.function.Functions#doNothingConsumer()
+   * @see funjava.util.function.FunConsumer#doNothingConsumer()
    */
   public Stream<ResultMap> queryToStream(String sql, Consumer<PreparedStatement> argSetter) {
     return new FunPreparedStatement(this, sql).queryToStream(argSetter);
   }
 
   /**
-   * Executes a {@link java.sql.PreparedStatement} using the given SQL, assigning the given parameters, and then relying
+   * Executes a {@link java.sql.PreparedStatement} using the given SQL, assigning the given parameters, and then
+   * relying
    * on the callback to iterate over and process the entire result set.
    *
    * @param sql                The SQL to execute; never {@code null}.
@@ -416,7 +422,8 @@ public class FunConnection implements Supplier<Connection> {
   }
 
   /**
-   * Executes a {@link java.sql.PreparedStatement} using the given SQL, assigning the given parameters, and then reading
+   * Executes a {@link java.sql.PreparedStatement} using the given SQL, assigning the given parameters, and then
+   * reading
    * the first column of the first returned result and casting it to the given type.
    *
    * @param sql      The SQL to execute; never {@code null}.
@@ -432,7 +439,8 @@ public class FunConnection implements Supplier<Connection> {
   }
 
   /**
-   * Executes a {@link java.sql.PreparedStatement} using the given SQL, assigning the given parameters, and then reading
+   * Executes a {@link java.sql.PreparedStatement} using the given SQL, assigning the given parameters, and then
+   * reading
    * the first column of the first returned result and using the converter to finesse it into the correct type.
    *
    * @param sql       The SQL to execute; never {@code null}.

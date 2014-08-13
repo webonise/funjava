@@ -2,6 +2,7 @@ package funjava.lang.reflect;
 
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
+import java.lang.reflect.UndeclaredThrowableException;
 import java.sql.SQLException;
 import java.sql.Wrapper;
 import java.util.*;
@@ -21,7 +22,8 @@ public class WrapperInvocationHandler<T> implements InvocationHandler {
   }
 
   @Override
-  public Object invoke(final Object proxy, final Method method, final Object[] args) throws Throwable {
+  public Object invoke(final Object proxy, final Method method, Object[] args) throws Throwable {
+    if (args == null) args = new Object[0];
     if (args.length == 1 && Class.class.isAssignableFrom(args[0].getClass())) {
       Class<?> clazz = Class.class.cast(args[0]);
       String methodName = method.getName();
@@ -40,7 +42,11 @@ public class WrapperInvocationHandler<T> implements InvocationHandler {
     Objects.requireNonNull(clazz, "class to unwrap to");
     if (wrappedIsWrapper) {
       Wrapper w = ((Wrapper) wrapped);
-      if (w.isWrapperFor(clazz)) return w.unwrap(clazz);
+      try {
+        if (w.isWrapperFor(clazz)) return w.unwrap(clazz);
+      } catch(SQLException | UndeclaredThrowableException e) {
+        // Driver doesn't implement the wrapper functionality
+      }
     }
     if (clazz.isAssignableFrom(wrapped.getClass())) return clazz.cast(wrapped);
     throw new SQLException("Could not unwrap " + wrapped + " to " + clazz);

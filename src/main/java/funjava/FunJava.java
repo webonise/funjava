@@ -55,7 +55,14 @@ public class FunJava {
       t.setPriority(Thread.NORM_PRIORITY);
       return t;
     };
-    return Executors.newCachedThreadPool(factory);
+    int lowLimit = Runtime.getRuntime().availableProcessors();
+    int highLimit = (lowLimit + 1) * (lowLimit + 1);
+    ThreadPoolExecutor tpe = new ThreadPoolExecutor(lowLimit, highLimit, 1L, TimeUnit.SECONDS,
+                                                       new ArrayBlockingQueue<Runnable>(highLimit * highLimit)
+    );
+    tpe.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+    tpe.setThreadFactory(factory);
+    return Executors.unconfigurableExecutorService(tpe);
   }
 
   /**
